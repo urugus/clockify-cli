@@ -42,7 +42,7 @@
     "@typescript/native-preview": "7.0.0-dev.20260421.2",
     "@vitest/coverage-v8": "^4.1.8",
     "oxlint": "^1.29.0",
-    "typescript": "^5.9.3",
+    "typescript": "^6.0.3",
     "vitest": "^4.0.14"
   },
   "engines": {
