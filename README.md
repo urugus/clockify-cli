@@ -23,6 +23,9 @@ pnpm build
 
 Build output is written to `dist/`.
 
+The build uses `tsgo` from `@typescript/native-preview`; `pnpm check` runs both
+`tsgo --noEmit` and `tsc --noEmit`.
+
 Run the CLI locally:
 
 ```sh
