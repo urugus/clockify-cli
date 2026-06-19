@@ -1,6 +1,6 @@
 {
   "name": "@urugus/clockify-cli",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A small command-line client for Clockify.",
   "type": "module",
   "bin": {
