@@ -23,6 +23,19 @@ const clockifyMocks = vi.hoisted(() => {
     listInProgressTimeEntries: vi.fn(),
     startTimer: vi.fn(),
     stopTimer: vi.fn(),
+    getTimeEntry: vi.fn(),
+    createTimeEntry: vi.fn(),
+    updateTimeEntry: vi.fn(),
+    deleteTimeEntry: vi.fn(),
+    getProject: vi.fn(),
+    createProject: vi.fn(),
+    updateProject: vi.fn(),
+    updateProjectCustomField: vi.fn(),
+    listUserGroups: vi.fn(),
+    addUserToGroup: vi.fn(),
+    removeUserFromGroup: vi.fn(),
+    listUsers: vi.fn(),
+    inviteUser: vi.fn(),
   };
 
   return {
@@ -124,6 +137,46 @@ describe("CLI program", () => {
     );
     clockifyMocks.client.startTimer.mockReturnValue(await okAsync({ id: "start1" }));
     clockifyMocks.client.stopTimer.mockReturnValue(await okAsync({ id: "stop1" }));
+    clockifyMocks.client.getTimeEntry.mockReturnValue(
+      await okAsync({
+        id: "te1",
+        taskId: "task1",
+        tagIds: ["tag1"],
+        billable: false,
+      }),
+    );
+    clockifyMocks.client.createTimeEntry.mockReturnValue(await okAsync({ id: "created1" }));
+    clockifyMocks.client.updateTimeEntry.mockReturnValue(await okAsync({ id: "updated1" }));
+    clockifyMocks.client.deleteTimeEntry.mockReturnValue(
+      await okAsync({ deleted: true, id: "te1" }),
+    );
+    clockifyMocks.client.getProject.mockReturnValue(
+      await okAsync({
+        id: "p1",
+        name: "Old",
+        clientId: "c1",
+        color: "#000000",
+        archived: false,
+        billable: false,
+        public: false,
+      }),
+    );
+    clockifyMocks.client.createProject.mockReturnValue(await okAsync({ id: "p2", name: "New" }));
+    clockifyMocks.client.updateProject.mockReturnValue(await okAsync({ id: "p1", name: "New" }));
+    clockifyMocks.client.updateProjectCustomField.mockReturnValue(
+      await okAsync({ id: "cf1", name: "Cost category" }),
+    );
+    clockifyMocks.client.listUserGroups.mockReturnValue(
+      await okAsync({ items: [{ id: "g1", name: "Group" }], lastPage: true }),
+    );
+    clockifyMocks.client.addUserToGroup.mockReturnValue(await okAsync({ id: "g1", name: "Group" }));
+    clockifyMocks.client.removeUserFromGroup.mockReturnValue(await okAsync({ ok: true, id: "g1" }));
+    clockifyMocks.client.listUsers.mockReturnValue(
+      await okAsync({ items: [{ id: "u2", email: "user@example.com" }], lastPage: true }),
+    );
+    clockifyMocks.client.inviteUser.mockReturnValue(
+      await okAsync({ id: "u2", email: "user@example.com" }),
+    );
   });
 
   afterEach(() => {
@@ -283,6 +336,225 @@ describe("CLI program", () => {
     });
     expect(stdout()).toContain('"id": "start1"');
     expect(stdout()).toContain('"id": "stop1"');
+  });
+
+  it("creates, updates, and deletes time entries", async () => {
+    const { createProgram } = await import("../../src/cli/program.js");
+    const { io, stdout } = createTestIo();
+
+    await createProgram({ io }).parseAsync([
+      "node",
+      "clockify",
+      "time-entries",
+      "create",
+      "--start",
+      "2026-06-19T00:00:00.000Z",
+      "--end",
+      "2026-06-19T01:00:00.000Z",
+      "--description",
+      "Work",
+      "--project-id",
+      "p1",
+      "--billable",
+    ]);
+    await createProgram({ io }).parseAsync([
+      "node",
+      "clockify",
+      "time-entries",
+      "update",
+      "te1",
+      "--start",
+      "2026-06-19T00:00:00.000Z",
+      "--end",
+      "2026-06-19T01:00:00.000Z",
+      "--description",
+      "Work",
+      "--project-id",
+      "p1",
+    ]);
+    await createProgram({ io }).parseAsync(["node", "clockify", "time-entries", "delete", "te1"]);
+
+    expect(clockifyMocks.client.createTimeEntry).toHaveBeenCalledWith({
+      workspaceId: "w1",
+      userId: undefined,
+      start: "2026-06-19T00:00:00.000Z",
+      end: "2026-06-19T01:00:00.000Z",
+      description: "Work",
+      projectId: "p1",
+      taskId: undefined,
+      tagIds: undefined,
+      billable: true,
+    });
+    expect(clockifyMocks.client.updateTimeEntry).toHaveBeenCalledWith({
+      workspaceId: "w1",
+      timeEntryId: "te1",
+      start: "2026-06-19T00:00:00.000Z",
+      end: "2026-06-19T01:00:00.000Z",
+      description: "Work",
+      projectId: "p1",
+      taskId: "task1",
+      tagIds: ["tag1"],
+      billable: false,
+    });
+    expect(clockifyMocks.client.deleteTimeEntry).toHaveBeenCalledWith({
+      workspaceId: "w1",
+      timeEntryId: "te1",
+    });
+    expect(stdout()).toContain('"id": "created1"');
+    expect(stdout()).toContain('"id": "updated1"');
+    expect(stdout()).toContain('"deleted": true');
+  });
+
+  it("creates and updates projects and project custom fields", async () => {
+    const { createProgram } = await import("../../src/cli/program.js");
+    const { io } = createTestIo();
+
+    await createProgram({ io }).parseAsync([
+      "node",
+      "clockify",
+      "projects",
+      "list",
+      "--name",
+      "Product",
+      "--strict-name-search",
+    ]);
+    await createProgram({ io }).parseAsync([
+      "node",
+      "clockify",
+      "projects",
+      "create",
+      "--name",
+      "New",
+      "--client-id",
+      "c1",
+      "--color",
+      "#123ABC",
+      "--no-public",
+    ]);
+    await createProgram({ io }).parseAsync([
+      "node",
+      "clockify",
+      "projects",
+      "update",
+      "p1",
+      "--name",
+      "New",
+      "--archived",
+    ]);
+    await createProgram({ io }).parseAsync([
+      "node",
+      "clockify",
+      "projects",
+      "custom-fields",
+      "update",
+      "p1",
+      "cf1",
+      "--default-value",
+      '"Internal"',
+      "--status",
+      "VISIBLE",
+    ]);
+
+    expect(clockifyMocks.client.listProjects).toHaveBeenCalledWith({
+      workspaceId: "w1",
+      page: 1,
+      pageSize: 50,
+      name: "Product",
+      strictNameSearch: true,
+    });
+    expect(clockifyMocks.client.createProject).toHaveBeenCalledWith({
+      workspaceId: "w1",
+      name: "New",
+      clientId: "c1",
+      color: "#123ABC",
+      billable: undefined,
+      public: false,
+    });
+    expect(clockifyMocks.client.updateProject).toHaveBeenCalledWith({
+      workspaceId: "w1",
+      projectId: "p1",
+      name: "New",
+      clientId: "c1",
+      color: "#000000",
+      archived: true,
+      billable: false,
+      isPublic: false,
+      note: undefined,
+    });
+    expect(clockifyMocks.client.updateProjectCustomField).toHaveBeenCalledWith({
+      workspaceId: "w1",
+      projectId: "p1",
+      customFieldId: "cf1",
+      defaultValue: "Internal",
+      status: "VISIBLE",
+    });
+  });
+
+  it("manages user groups and users", async () => {
+    const { createProgram } = await import("../../src/cli/program.js");
+    const { io } = createTestIo();
+
+    await createProgram({ io }).parseAsync(["node", "clockify", "user-groups", "list"]);
+    await createProgram({ io }).parseAsync([
+      "node",
+      "clockify",
+      "user-groups",
+      "add-user",
+      "g1",
+      "u2",
+    ]);
+    await createProgram({ io }).parseAsync([
+      "node",
+      "clockify",
+      "user-groups",
+      "remove-user",
+      "g1",
+      "u2",
+    ]);
+    await createProgram({ io }).parseAsync([
+      "node",
+      "clockify",
+      "users",
+      "list",
+      "--email",
+      "user@example.com",
+    ]);
+    await createProgram({ io }).parseAsync([
+      "node",
+      "clockify",
+      "users",
+      "invite",
+      "user@example.com",
+      "--no-send-email",
+    ]);
+
+    expect(clockifyMocks.client.listUserGroups).toHaveBeenCalledWith({
+      workspaceId: "w1",
+      page: 1,
+      pageSize: 50,
+      includeTeamManagers: false,
+    });
+    expect(clockifyMocks.client.addUserToGroup).toHaveBeenCalledWith({
+      workspaceId: "w1",
+      groupId: "g1",
+      userId: "u2",
+    });
+    expect(clockifyMocks.client.removeUserFromGroup).toHaveBeenCalledWith({
+      workspaceId: "w1",
+      groupId: "g1",
+      userId: "u2",
+    });
+    expect(clockifyMocks.client.listUsers).toHaveBeenCalledWith({
+      workspaceId: "w1",
+      page: 1,
+      pageSize: 50,
+      email: "user@example.com",
+    });
+    expect(clockifyMocks.client.inviteUser).toHaveBeenCalledWith({
+      workspaceId: "w1",
+      email: "user@example.com",
+      sendEmail: false,
+    });
   });
 
   it("prints errors and sets exit code", async () => {

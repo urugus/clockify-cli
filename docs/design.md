@@ -85,6 +85,7 @@ Every recoverable failure should return `Result<T, AppError>` or
 export type AppErrorCode =
   | "clockify_http_error"
   | "clockify_invalid_response"
+  | "clockify_rate_limited"
   | "config_invalid"
   | "config_write_failed"
   | "keychain_failed"
@@ -285,6 +286,158 @@ Design choices:
 - `startTimer` receives a timestamp from the caller, not from inside the pure
   payload builder, so tests stay deterministic.
 
+## Issue 4 Write and Management Interface
+
+The write command surface should extend the current resource groups instead of
+adding a separate admin namespace. Existing global conventions still apply:
+
+- `--profile` and `--workspace-id` are accepted by every workspace-scoped
+  command.
+- Commands returning API entities accept `--format json|csv` and default to
+  `json`, matching the existing read commands.
+- Commands backed by `204 No Content` return a small JSON confirmation object by
+  default, such as `{ "deleted": true, "id": "..." }`, so scripts do not have to
+  parse human-only text.
+- Boolean options use Commander paired flags, for example
+  `--archived` and `--no-archived`. Update commands must leave the parsed value
+  as `undefined` when neither flag is present so omission can mean "preserve the
+  current value".
+- Multi-value options repeat the singular flag name already used by
+  `timer start`, for example `--tag-id <id> --tag-id <id>`.
+- The first implementation should avoid a generic raw JSON option. Add typed
+  flags for the fields the CLI deliberately supports, then add richer payload
+  support only when there is a concrete workflow that needs it.
+
+Planned CLI commands:
+
+```text
+clockify time-entries create --start <iso> --end <iso> --description <text> --project-id <id> [--task-id <id>] [--tag-id <id>...] [--billable] [--no-billable] [--user-id <id>] [--profile <name>] [--workspace-id <id>] [--format json|csv]
+clockify time-entries update <time-entry-id> --start <iso> --end <iso> --description <text> --project-id <id> [--task-id <id>] [--tag-id <id>...] [--clear-tags] [--billable] [--no-billable] [--profile <name>] [--workspace-id <id>] [--format json|csv]
+clockify time-entries delete <time-entry-id> [--profile <name>] [--workspace-id <id>]
+
+clockify projects list [--name <query>] [--strict-name-search] [--profile <name>] [--workspace-id <id>] [--page <n>] [--page-size <n>] [--format json|csv]
+clockify projects create --name <name> --client-id <id> [--color <hex>] [--billable] [--no-billable] [--public] [--no-public] [--profile <name>] [--workspace-id <id>] [--format json|csv]
+clockify projects update <project-id> [--name <name>] [--client-id <id>] [--color <hex>] [--archived] [--no-archived] [--billable] [--no-billable] [--public] [--no-public] [--note <text>] [--profile <name>] [--workspace-id <id>] [--format json|csv]
+
+clockify projects custom-fields update <project-id> <custom-field-id> [--default-value <json>] [--status INACTIVE|VISIBLE|INVISIBLE] [--profile <name>] [--workspace-id <id>] [--format json|csv]
+
+clockify user-groups list [--include-team-managers] [--profile <name>] [--workspace-id <id>] [--page <n>] [--page-size <n>] [--format json|csv]
+clockify user-groups add-user <group-id> <user-id> [--profile <name>] [--workspace-id <id>] [--format json|csv]
+clockify user-groups remove-user <group-id> <user-id> [--profile <name>] [--workspace-id <id>] [--format json|csv]
+
+clockify users list [--email <email>] [--profile <name>] [--workspace-id <id>] [--page <n>] [--page-size <n>] [--format json|csv]
+clockify users invite <email> [--send-email] [--no-send-email] [--profile <name>] [--workspace-id <id>] [--format json|csv]
+```
+
+Time entry semantics:
+
+- `time-entries create` uses the current user endpoint unless `--user-id` is
+  provided. When `--user-id` is provided, use the "add time entry for another
+  user" endpoint.
+- `time-entries update` maps to Clockify's `PUT /time-entries/{id}` endpoint and
+  is intentionally replace-like. Required flags are enforced even if some
+  underlying API fields are optional, so the user cannot accidentally clear a
+  field by omission.
+- Omitted optional update fields preserve the current value. The CLI action
+  should fetch the current time entry, then call a pure
+  `buildTimeEntryUpdatePayload(current, patch)` helper before sending `PUT`.
+  This is last-write-wins and should be documented in the command help.
+- Tags are preserved when `--tag-id` is omitted. Passing one or more `--tag-id`
+  values replaces the tag list. Passing `--clear-tags` sends an empty tag list,
+  and cannot be combined with `--tag-id`.
+- `timer start` remains the ergonomic running-timer command. `time-entries
+  create` is for complete manual entries with explicit `--start` and `--end`.
+- `--billable` defaults to `false` only for create commands. For update commands,
+  omission means "do not include this optional field" unless the API contract for
+  that endpoint requires it.
+- `time-entries delete` always emits a JSON confirmation object and does not
+  accept `--format`.
+
+Project semantics:
+
+- `projects list --name` is a narrow wrapper around the project list endpoint
+  with the `name` query parameter. `--strict-name-search` maps to the API query
+  flag and defaults to false.
+- `projects create` starts with the fields needed by the tracked workflow:
+  `name`, `clientId`, optional `color`, optional `billable`, and optional
+  visibility. Rates, estimates, memberships, and templates remain out of scope.
+- `projects update` validates that at least one mutable field is present. If the
+  Clockify endpoint requires a full replacement payload in practice, the CLI
+  action should fetch the current project, pass it with the parsed patch into a
+  pure `buildProjectUpdatePayload(current, patch)` helper, and then send the
+  complete supported payload. This is last-write-wins.
+- The CLI flags are `--public` and `--no-public`, while the request body field
+  remains `isPublic` if required by the API.
+
+Custom field semantics:
+
+- `projects custom-fields update` is scoped under `projects` because the
+  operation mutates a custom field assignment on a specific project, not the
+  workspace-level custom field definition.
+- `--default-value` is parsed as JSON. This keeps string, number, boolean,
+  array, object, and null values representable without inventing per-type flags.
+- At least one of `--default-value` or `--status` is required.
+- JSON parsing must go through
+  `validateJsonValue(raw: string): Result<unknown, AppError>` so malformed JSON
+  returns `validation_error` instead of escaping the `Result` chain.
+- The response is decoded as a project custom field assignment, not as a full
+  `Project`.
+
+User and group semantics:
+
+- `users list --email` should prefer the workspace user filter endpoint if the
+  public list endpoint cannot filter by email directly. The command still
+  exposes one simple interface for duplicate checks.
+- `users invite` maps to adding a user to a workspace and defaults
+  `--send-email` to `true`, matching Clockify's API default and the command
+  name.
+- `user-groups add-user` and `remove-user` return the updated user group entity
+  when Clockify returns one. If a group mutation endpoint returns no body, the
+  client returns a JSON confirmation object rather than failing response
+  decoding.
+- User groups and project-level custom field defaults may be gated by Clockify
+  plan or permission level. A 403 from these endpoints should produce a message
+  that mentions the likely plan or permission requirement.
+
+Client additions:
+
+```ts
+type ClockifyClient = {
+  readonly getTimeEntry: (input: GetTimeEntryInput) => ResultAsync<TimeEntry, AppError>;
+  readonly createTimeEntry: (input: CreateTimeEntryInput) => ResultAsync<TimeEntry, AppError>;
+  readonly updateTimeEntry: (input: UpdateTimeEntryInput) => ResultAsync<TimeEntry, AppError>;
+  readonly deleteTimeEntry: (input: DeleteTimeEntryInput) => ResultAsync<DeleteResult, AppError>;
+  readonly getProject: (input: GetProjectInput) => ResultAsync<Project, AppError>;
+  readonly createProject: (input: CreateProjectInput) => ResultAsync<Project, AppError>;
+  readonly listProjects: (input: ListProjectsInput) => ResultAsync<PageResult<Project>, AppError>;
+  readonly updateProject: (input: UpdateProjectInput) => ResultAsync<Project, AppError>;
+  readonly updateProjectCustomField: (input: UpdateProjectCustomFieldInput) => ResultAsync<ProjectCustomFieldAssignment, AppError>;
+  readonly listUserGroups: (input: ListUserGroupsInput) => ResultAsync<PageResult<UserGroup>, AppError>;
+  readonly addUserToGroup: (input: UserGroupMembershipInput) => ResultAsync<UserGroupMutationResult, AppError>;
+  readonly removeUserFromGroup: (input: UserGroupMembershipInput) => ResultAsync<UserGroupMutationResult, AppError>;
+  readonly listUsers: (input: ListUsersInput) => ResultAsync<PageResult<WorkspaceUser>, AppError>;
+  readonly inviteUser: (input: InviteUserInput) => ResultAsync<WorkspaceUser, AppError>;
+};
+```
+
+Implementation notes:
+
+- Add schemas for `UserGroup`, `WorkspaceUser`, `ProjectCustomFieldAssignment`,
+  and mutation confirmation objects using the same "required core fields plus
+  passthrough" policy.
+- Add validation helpers for paired booleans, hex colors, enum values, email
+  strings, JSON values, mutually exclusive options, and "at least one option
+  present".
+- Add a `requestNoContent` or `requestJsonOrNoContent` helper only when needed
+  by mutation endpoints that can return 204; keep the current JSON path
+  unchanged for existing commands.
+- All new client methods inherit the existing 429 handling and return
+  `clockify_rate_limited`.
+- Watch Clockify's inconsistent query parameter casing: existing list helpers
+  use `page` and `pageSize`; newer documented endpoints may require
+  `page-size`. Encode that difference at the client method boundary, not in CLI
+  validation.
+
 ## Pagination
 
 Clockify list endpoints commonly use `page` and `pageSize`, with `Last-Page` in
@@ -359,6 +512,25 @@ Important test cases:
 - Timer payload construction is deterministic with injected timestamps.
 - CSV handles nulls, commas, quotes, newlines, and nested values.
 - CSV handles empty row arrays.
+
+Write command test cases:
+
+- `buildTimeEntryUpdatePayload` preserves existing optional fields when update
+  flags are omitted.
+- `buildTimeEntryUpdatePayload` replaces tags when `--tag-id` is provided,
+  clears tags only when `--clear-tags` is provided, and rejects combining both.
+- `deleteTimeEntry` turns a 204 response into the documented confirmation JSON.
+- `buildProjectUpdatePayload` preserves existing values, updates each supported
+  field independently, and rejects an empty patch.
+- `validateJsonValue` accepts valid JSON values and rejects malformed JSON as
+  `validation_error`.
+- `validateAtLeastOnePresent` is covered for `projects update` and
+  `projects custom-fields update`.
+- Hex color validation accepts only `#RRGGBB`.
+- Paired boolean flags preserve `undefined` for omitted update values and parse
+  explicit true/false values correctly.
+- 403 responses from plan- or permission-sensitive endpoints produce targeted
+  messages.
 
 ## Implementation Phases
 
