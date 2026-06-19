@@ -1,0 +1,20 @@
+{
+  "name": "clockify-cli",
+  "interface": {
+    "displayName": "clockify-cli"
+  },
+  "plugins": [
+    {
+      "name": "clockify-cli",
+      "source": {
+        "source": "local",
+        "path": "./plugins/clockify-cli"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "name": "clockify-cli",
+  "version": "0.1.0",
+  "description": "Codex workflows for developing, setting up, and using clockify-cli.",
+  "author": {
+    "name": "urugus"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "clockify-cli",
+    "shortDescription": "Develop, set up, and use clockify-cli with Codex.",
+    "longDescription": "Provides focused Codex skills for clockify-cli development, first-time setup, and day-to-day CLI usage.",
+    "developerName": "urugus",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Help me use clockify-cli.",
+      "Set up clockify-cli from source.",
+      "Work on the clockify-cli repo."
+    ]
+  }
+}

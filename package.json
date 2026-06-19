@@ -1,0 +1,53 @@
+{
+  "name": "@urugus/clockify-cli",
+  "version": "0.1.0",
+  "description": "A small command-line client for Clockify.",
+  "type": "module",
+  "bin": {
+    "clockify": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsgo -p tsconfig.json",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "lint": "pnpm exec oxlint .",
+    "format": "pnpm exec biome check --write .",
+    "check": "pnpm exec biome check . && pnpm exec oxlint . && pnpm exec vitest run --coverage && pnpm exec tsgo -p tsconfig.json --noEmit && pnpm exec tsc -p tsconfig.json --noEmit",
+    "prepack": "pnpm build",
+    "release:check": "pnpm check && pnpm build && npm pack --dry-run --cache /tmp/clockify-cli-npm-cache"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/urugus/clockify-cli.git"
+  },
+  "bugs": {
+    "url": "https://github.com/urugus/clockify-cli/issues"
+  },
+  "homepage": "https://github.com/urugus/clockify-cli#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@inquirer/prompts": "^8.0.1",
+    "commander": "^14.0.2",
+    "neverthrow": "^8.2.0",
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.2.0",
+    "@types/node": "^25.0.0",
+    "@typescript/native-preview": "7.0.0-dev.20260421.2",
+    "@vitest/coverage-v8": "^4.1.8",
+    "oxlint": "^1.29.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.14"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=10.33.0"
+  },
+  "packageManager": "pnpm@10.33.0"
+}

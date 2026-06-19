@@ -1,0 +1,24 @@
+{
+  "name": "clockify-cli",
+  "owner": {
+    "name": "urugus"
+  },
+  "description": "Claude Code plugins for clockify-cli workflows.",
+  "plugins": [
+    {
+      "name": "clockify-cli",
+      "source": "./plugins/clockify-cli",
+      "description": "Claude Code workflows for developing, setting up, and using clockify-cli.",
+      "version": "0.1.0",
+      "author": {
+        "name": "urugus"
+      },
+      "category": "developer-tools",
+      "tags": [
+        "clockify",
+        "cli",
+        "skills"
+      ]
+    }
+  ]
+}
