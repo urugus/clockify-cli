@@ -160,6 +160,134 @@ describe("Clockify client", () => {
     );
   });
 
+  it("creates, updates, gets, and deletes time entries", async () => {
+    const fetchImpl = vi
+      .fn<FetchLike>()
+      .mockResolvedValueOnce(jsonResponse({ id: "created1" }, 201))
+      .mockResolvedValueOnce(jsonResponse({ id: "te1", tagIds: ["tag1"] }))
+      .mockResolvedValueOnce(jsonResponse({ id: "updated1" }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    const client = clientWithFetch(fetchImpl);
+
+    expect(
+      (
+        await client.createTimeEntry({
+          workspaceId: "w1",
+          userId: "u1",
+          start: "2026-06-19T00:00:00.000Z",
+          end: "2026-06-19T01:00:00.000Z",
+          description: "Work",
+          projectId: "p1",
+          billable: true,
+        })
+      ).value,
+    ).toEqual({ id: "created1" });
+    expect((await client.getTimeEntry({ workspaceId: "w1", timeEntryId: "te1" })).value).toEqual({
+      id: "te1",
+      tagIds: ["tag1"],
+    });
+    expect(
+      (
+        await client.updateTimeEntry({
+          workspaceId: "w1",
+          timeEntryId: "te1",
+          start: "2026-06-19T00:00:00.000Z",
+          end: "2026-06-19T01:00:00.000Z",
+          description: "Work",
+          projectId: "p1",
+          tagIds: [],
+        })
+      ).value,
+    ).toEqual({ id: "updated1" });
+    expect((await client.deleteTimeEntry({ workspaceId: "w1", timeEntryId: "te1" })).value).toEqual(
+      {
+        deleted: true,
+        id: "te1",
+      },
+    );
+
+    expect(fetchImpl).toHaveBeenNthCalledWith(
+      1,
+      "https://api.clockify.me/api/v1/workspaces/w1/user/u1/time-entries",
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(fetchImpl).toHaveBeenNthCalledWith(
+      3,
+      "https://api.clockify.me/api/v1/workspaces/w1/time-entries/te1",
+      expect.objectContaining({ method: "PUT" }),
+    );
+    expect(fetchImpl).toHaveBeenNthCalledWith(
+      4,
+      "https://api.clockify.me/api/v1/workspaces/w1/time-entries/te1",
+      expect.objectContaining({ method: "DELETE" }),
+    );
+  });
+
+  it("manages projects, custom fields, user groups, and users", async () => {
+    const fetchImpl = vi
+      .fn<FetchLike>()
+      .mockResolvedValueOnce(jsonResponse([{ id: "p1", name: "Project" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "p1", name: "Project" }))
+      .mockResolvedValueOnce(jsonResponse({ id: "p2", name: "New" }, 201))
+      .mockResolvedValueOnce(jsonResponse({ id: "p1", name: "Updated" }))
+      .mockResolvedValueOnce(jsonResponse({ id: "cf1", name: "Cost" }))
+      .mockResolvedValueOnce(jsonResponse([{ id: "g1", name: "Group" }]))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(jsonResponse({ id: "g1", name: "Group" }))
+      .mockResolvedValueOnce(jsonResponse([{ id: "u1", email: "user@example.com" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "u2", email: "new@example.com" }));
+    const client = clientWithFetch(fetchImpl);
+
+    await client.listProjects({
+      workspaceId: "w1",
+      name: "Project",
+      strictNameSearch: true,
+    });
+    await client.getProject({ workspaceId: "w1", projectId: "p1" });
+    await client.createProject({ workspaceId: "w1", name: "New", clientId: "c1" });
+    await client.updateProject({ workspaceId: "w1", projectId: "p1", name: "Updated" });
+    await client.updateProjectCustomField({
+      workspaceId: "w1",
+      projectId: "p1",
+      customFieldId: "cf1",
+      defaultValue: "Internal",
+      status: "VISIBLE",
+    });
+    await client.listUserGroups({ workspaceId: "w1", includeTeamManagers: false });
+    expect(
+      (await client.addUserToGroup({ workspaceId: "w1", groupId: "g1", userId: "u1" })).value,
+    ).toEqual({ ok: true, id: "g1" });
+    expect(
+      (await client.removeUserFromGroup({ workspaceId: "w1", groupId: "g1", userId: "u1" })).value,
+    ).toEqual({ id: "g1", name: "Group" });
+    await client.listUsers({ workspaceId: "w1", email: "user@example.com" });
+    await client.inviteUser({ workspaceId: "w1", email: "new@example.com", sendEmail: false });
+
+    expect(fetchImpl).toHaveBeenNthCalledWith(
+      1,
+      "https://api.clockify.me/api/v1/workspaces/w1/projects?page=1&pageSize=50&name=Project&strict-name-search=true",
+      expect.anything(),
+    );
+    expect(fetchImpl).toHaveBeenNthCalledWith(
+      6,
+      "https://api.clockify.me/api/v1/workspaces/w1/user-groups?page=1&page-size=50&include-team-managers=false",
+      expect.anything(),
+    );
+    expect(fetchImpl).toHaveBeenNthCalledWith(
+      7,
+      "https://api.clockify.me/api/v1/workspaces/w1/user-groups/g1/users",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ userId: "u1" }),
+      }),
+    );
+    expect(fetchImpl).toHaveBeenNthCalledWith(
+      10,
+      "https://api.clockify.me/api/v1/workspaces/w1/users?send-email=false",
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+
   it("rejects invalid page input before requesting", async () => {
     const fetchImpl = vi.fn<FetchLike>().mockResolvedValue(jsonResponse([]));
 

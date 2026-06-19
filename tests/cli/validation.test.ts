@@ -5,12 +5,16 @@ import {
   validateOptionalText,
   validatePageOptions,
   validatePositiveInteger,
+  validateProjectCustomFieldUpdateOptions,
+  validateProjectUpdateOptions,
   validateRequiredText,
   validateResourceListOptions,
   validateTaskListOptions,
   validateTimeEntriesListOptions,
+  validateTimeEntryUpdateOptions,
   validateTimerStartOptions,
   validateTimerStopOptions,
+  validateUserInviteOptions,
 } from "../../src/cli/validation.js";
 
 describe("CLI validation", () => {
@@ -123,5 +127,80 @@ describe("CLI validation", () => {
       userId: "u1",
       end: "2026-06-19T01:00:00.000Z",
     });
+  });
+
+  it("validates write command options", () => {
+    expect(
+      validateTimeEntryUpdateOptions({
+        timeEntryId: "te1",
+        start: "2026-06-19T00:00:00.000Z",
+        end: "2026-06-19T01:00:00.000Z",
+        description: "Work",
+        projectId: "p1",
+        tagId: ["tag1"],
+        clearTags: true,
+      })._unsafeUnwrapErr().message,
+    ).toBe("Clear tags cannot be combined with tag ids.");
+
+    expect(
+      validateProjectUpdateOptions({
+        projectId: "p1",
+        color: "#123ABC",
+        archived: false,
+      }).value,
+    ).toEqual({
+      profile: undefined,
+      workspaceId: undefined,
+      format: undefined,
+      projectId: "p1",
+      name: undefined,
+      clientId: undefined,
+      color: "#123ABC",
+      archived: false,
+      billable: undefined,
+      public: undefined,
+      note: undefined,
+    });
+    expect(validateProjectUpdateOptions({ projectId: "p1" })._unsafeUnwrapErr().message).toBe(
+      "At least one project field is required.",
+    );
+    expect(
+      validateProjectUpdateOptions({ projectId: "p1", color: "123ABC" })._unsafeUnwrapErr().message,
+    ).toBe("Color must be a #RRGGBB color.");
+  });
+
+  it("validates custom field JSON and user invite email", () => {
+    expect(
+      validateProjectCustomFieldUpdateOptions({
+        projectId: "p1",
+        customFieldId: "cf1",
+        defaultValue: '"Internal"',
+        status: "VISIBLE",
+      }).value,
+    ).toEqual({
+      profile: undefined,
+      workspaceId: undefined,
+      format: undefined,
+      projectId: "p1",
+      customFieldId: "cf1",
+      defaultValue: "Internal",
+      status: "VISIBLE",
+    });
+    expect(
+      validateProjectCustomFieldUpdateOptions({
+        projectId: "p1",
+        customFieldId: "cf1",
+        defaultValue: "{",
+      })._unsafeUnwrapErr().message,
+    ).toBe("Default value must be valid JSON.");
+    expect(
+      validateProjectCustomFieldUpdateOptions({
+        projectId: "p1",
+        customFieldId: "cf1",
+      })._unsafeUnwrapErr().message,
+    ).toBe("At least one custom field update option is required.");
+    expect(validateUserInviteOptions({ email: "bad" })._unsafeUnwrapErr().message).toBe(
+      "Email must be an email address.",
+    );
   });
 });

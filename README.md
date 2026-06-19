@@ -114,6 +114,7 @@ List workspace resources:
 
 ```sh
 clockify projects list
+clockify projects list --name "Product" --strict-name-search
 clockify clients list
 clockify tags list
 clockify tasks list --project-id <project-id>
@@ -144,6 +145,44 @@ Start and stop a timer:
 ```sh
 clockify timer start --description "Implementation work" --project-id <project-id>
 clockify timer stop
+```
+
+Create, update, and delete complete time entries:
+
+```sh
+clockify time-entries create \
+  --start 2026-06-19T00:00:00.000Z \
+  --end 2026-06-19T01:00:00.000Z \
+  --description "Implementation work" \
+  --project-id <project-id>
+
+clockify time-entries update <time-entry-id> \
+  --start 2026-06-19T00:00:00.000Z \
+  --end 2026-06-19T01:00:00.000Z \
+  --description "Implementation work" \
+  --project-id <project-id>
+
+clockify time-entries delete <time-entry-id>
+```
+
+Manage projects and project custom fields:
+
+```sh
+clockify projects create --name "New project" --client-id <client-id>
+clockify projects update <project-id> --archived
+clockify projects custom-fields update <project-id> <field-id> \
+  --default-value '"Internal"' \
+  --status VISIBLE
+```
+
+Manage workspace users and user groups:
+
+```sh
+clockify users list --email person@example.com
+clockify users invite person@example.com
+clockify user-groups list
+clockify user-groups add-user <group-id> <user-id>
+clockify user-groups remove-user <group-id> <user-id>
 ```
 
 Use a non-default profile or workspace:

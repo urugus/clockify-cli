@@ -47,6 +47,16 @@ export const projectSchema = z
 
 export type Project = z.infer<typeof projectSchema>;
 
+export const projectCustomFieldAssignmentSchema = z
+  .object({
+    id: z.string().min(1),
+    name: z.string().optional(),
+    workspaceId: z.string().optional(),
+  })
+  .passthrough();
+
+export type ProjectCustomFieldAssignment = z.infer<typeof projectCustomFieldAssignmentSchema>;
+
 export const clientSchema = z
   .object({
     id: z.string().min(1),
@@ -103,6 +113,46 @@ export const timeEntrySchema = z
 
 export type TimeEntry = z.infer<typeof timeEntrySchema>;
 
+export const userGroupSchema = z
+  .object({
+    id: z.string().min(1),
+    name: z.string(),
+    userIds: z.array(z.string()).optional(),
+    workspaceId: z.string().optional(),
+  })
+  .passthrough();
+
+export type UserGroup = z.infer<typeof userGroupSchema>;
+
+export const workspaceUserSchema = z
+  .object({
+    id: z.string().min(1),
+    name: z.string().optional(),
+    email: z.string().optional(),
+    status: z.string().optional(),
+  })
+  .passthrough();
+
+export type WorkspaceUser = z.infer<typeof workspaceUserSchema>;
+
+export const deleteResultSchema = z
+  .object({
+    deleted: z.boolean(),
+    id: z.string().min(1),
+  })
+  .passthrough();
+
+export type DeleteResult = z.infer<typeof deleteResultSchema>;
+
+export const mutationResultSchema = z
+  .object({
+    ok: z.boolean(),
+    id: z.string().min(1),
+  })
+  .passthrough();
+
+export type MutationResult = z.infer<typeof mutationResultSchema>;
+
 export const decodeUnknownJson = (value: unknown, context: string): Result<unknown, AppError> => {
   if (value == null) {
     return err(
@@ -122,6 +172,18 @@ export const decodeWorkspaces = (value: unknown): Result<readonly Workspace[], A
 export const decodeProjects = (value: unknown): Result<readonly Project[], AppError> =>
   parseSchema(z.array(projectSchema), value, "Clockify projects response is invalid.");
 
+export const decodeProject = (value: unknown): Result<Project, AppError> =>
+  parseSchema(projectSchema, value, "Clockify project response is invalid.");
+
+export const decodeProjectCustomFieldAssignment = (
+  value: unknown,
+): Result<ProjectCustomFieldAssignment, AppError> =>
+  parseSchema(
+    projectCustomFieldAssignmentSchema,
+    value,
+    "Clockify project custom field response is invalid.",
+  );
+
 export const decodeClients = (value: unknown): Result<readonly Client[], AppError> =>
   parseSchema(z.array(clientSchema), value, "Clockify clients response is invalid.");
 
@@ -136,3 +198,15 @@ export const decodeTimeEntry = (value: unknown): Result<TimeEntry, AppError> =>
 
 export const decodeTimeEntries = (value: unknown): Result<readonly TimeEntry[], AppError> =>
   parseSchema(z.array(timeEntrySchema), value, "Clockify time entries response is invalid.");
+
+export const decodeUserGroups = (value: unknown): Result<readonly UserGroup[], AppError> =>
+  parseSchema(z.array(userGroupSchema), value, "Clockify user groups response is invalid.");
+
+export const decodeUserGroup = (value: unknown): Result<UserGroup, AppError> =>
+  parseSchema(userGroupSchema, value, "Clockify user group response is invalid.");
+
+export const decodeWorkspaceUsers = (value: unknown): Result<readonly WorkspaceUser[], AppError> =>
+  parseSchema(z.array(workspaceUserSchema), value, "Clockify workspace users response is invalid.");
+
+export const decodeWorkspaceUser = (value: unknown): Result<WorkspaceUser, AppError> =>
+  parseSchema(workspaceUserSchema, value, "Clockify workspace user response is invalid.");
