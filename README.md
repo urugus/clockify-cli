@@ -32,6 +32,19 @@ Run the CLI locally:
 node dist/index.js --help
 ```
 
+## Release
+
+Publishing is handled by GitHub Actions when a `v*` tag is pushed. The tag must
+match `package.json` exactly, for example `v0.2.0` for version `0.2.0`.
+
+The publish workflow requires the `NPM_TOKEN` repository secret.
+
+```sh
+pnpm release:check
+git tag -a v0.2.0 -m "v0.2.0"
+git push origin v0.2.0
+```
+
 ## Configuration
 
 Create or update a profile:
