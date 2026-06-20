@@ -96,7 +96,7 @@ export const timeEntrySchema = z
     description: z.string().optional(),
     projectId: z.string().nullable().optional(),
     taskId: z.string().nullable().optional(),
-    tagIds: z.array(z.string()).optional(),
+    tagIds: z.array(z.string()).nullable().optional(),
     userId: z.string().optional(),
     workspaceId: z.string().optional(),
     billable: z.boolean().optional(),

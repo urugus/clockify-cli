@@ -30,7 +30,7 @@ export const buildTimeEntryUpdatePayload = (
   description: patch.description,
   projectId: patch.projectId,
   taskId: patch.taskId ?? current.taskId,
-  tagIds: patch.clearTags ? [] : (patch.tagIds ?? current.tagIds),
+  tagIds: patch.clearTags ? [] : (patch.tagIds ?? current.tagIds ?? undefined),
   billable: patch.billable ?? current.billable,
 });
 
