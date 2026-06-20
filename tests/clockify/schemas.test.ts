@@ -28,7 +28,11 @@ describe("Clockify schemas", () => {
       { id: "task1", name: "Task" },
     ]);
     expect(decodeTimeEntry({ id: "te1" }).value).toEqual({ id: "te1" });
+    expect(decodeTimeEntry({ id: "te1", tagIds: null }).value).toEqual({ id: "te1", tagIds: null });
     expect(decodeTimeEntries([{ id: "te1" }]).value).toEqual([{ id: "te1" }]);
+    expect(decodeTimeEntries([{ id: "te1", tagIds: null }]).value).toEqual([
+      { id: "te1", tagIds: null },
+    ]);
   });
 
   it("rejects invalid response shapes", () => {

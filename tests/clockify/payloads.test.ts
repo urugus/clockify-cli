@@ -49,6 +49,19 @@ describe("Clockify payload builders", () => {
     expect(buildTimeEntryUpdatePayload(current, { ...patch, clearTags: true }).tagIds).toEqual([]);
   });
 
+  it("coerces null tagIds from current entry to undefined in payload", () => {
+    const current = { id: "te1", tagIds: null };
+    const patch = {
+      start: "2026-06-19T00:00:00.000Z",
+      end: "2026-06-19T01:00:00.000Z",
+      description: "Work",
+      projectId: "p1",
+      clearTags: false,
+    };
+
+    expect(buildTimeEntryUpdatePayload(current, patch).tagIds).toBeUndefined();
+  });
+
   it("preserves project fields when building update payloads", () => {
     expect(
       buildProjectUpdatePayload(
